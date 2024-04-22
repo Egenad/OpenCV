@@ -42,7 +42,14 @@ public class CustomCameraActivity extends CameraActivity implements CvCameraView
     private SeekBar gradientSeekBar;
     private SeekBar angleSeekBar;
 
+    private Mat gradX;
+    private Mat gradY;
+    private Mat magnitude;
+    private Mat angle;
+
     private int kernelSize = 5;
+    private int edgeGradient = 80;
+    private int angleTH = 100;
 
     public CustomCameraActivity() {
         Log.i(TAG, "Instantiated new " + this.getClass());
@@ -75,6 +82,11 @@ public class CustomCameraActivity extends CameraActivity implements CvCameraView
         mEdges = new Mat();
         mResult = new Mat();
 
+        gradX = new Mat();
+        gradY = new Mat();
+        magnitude = new Mat();
+        angle = new Mat();
+
         stop = false;
 
         startStopButton = findViewById(R.id.start_stop_button);
@@ -93,8 +105,39 @@ public class CustomCameraActivity extends CameraActivity implements CvCameraView
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 kernelSize = progress;
 
-                if(kernelSize == 0) kernelSize = 1;
-                if(kernelSize % 2 == 0) kernelSize++;
+                if(kernelSize == 0 || kernelSize % 2 == 0) kernelSize++;
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+
+        gradientSeekBar = findViewById(R.id.gradient_seekbar);
+        gradientSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                edgeGradient = progress;
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
+        });
+
+        angleSeekBar = findViewById(R.id.angle_seekbar);
+        angleSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                angleTH = progress;
             }
 
             @Override
@@ -154,21 +197,17 @@ public class CustomCameraActivity extends CameraActivity implements CvCameraView
             Imgproc.GaussianBlur(rgba, mBlur, new Size(kernelSize, kernelSize), 0, 0); // 5x5 Gaussian Blur
             Imgproc.cvtColor(mBlur, mGray, Imgproc.COLOR_RGBA2GRAY); // Image to gray scale
 
-            // Calcular el gradiente en las direcciones x e y
-            Mat gradX = new Mat();
-            Mat gradY = new Mat();
-            Imgproc.Sobel(mGray, gradX, CvType.CV_16S, 1, 0); // Gradiente en dirección x
-            Imgproc.Sobel(mGray, gradY, CvType.CV_16S, 0, 1); // Gradiente en dirección y
+            // Gradient calculation
+            Imgproc.Sobel(mGray, gradX, CvType.CV_32F, 1, 0); // X direction
+            Imgproc.Sobel(mGray, gradY, CvType.CV_32F, 0, 1); // Y direction
 
-            // Calcular la magnitud del gradiente
-            Mat magnitude = new Mat();
+            // Magnitude
             Core.magnitude(gradX, gradY, magnitude);
 
-            // Calcular la dirección del gradiente
-            Mat angle = new Mat();
+            // Gradient direction
             Core.phase(gradX, gradY, angle);
 
-            Imgproc.Canny(mGray, mEdges, 80, 100); // Canny edge detection
+            Imgproc.Canny(mGray, mEdges, edgeGradient, angleTH); // Canny edge detection
             Imgproc.cvtColor(mEdges, mResult, Imgproc.COLOR_GRAY2RGBA); // Change color to detected edges
         }else{
             mResult = rgba;
